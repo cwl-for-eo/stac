@@ -4,7 +4,7 @@ This CWL document takes an URL to a Sentinel-2 STAC Item and resolves the asset 
 
 It relies on `curl` and `jq` to get the STAC Item and parse its JSON content.
 
-## The CWL document
+## The CWL CommandLineTool 
 
 The CWL document contains a `CommandLineTool` element that invoques the command:
 
@@ -54,6 +54,86 @@ outputs:
 
 cwlVersion: v1.0
 ```
+
+## The CWL Workflow
+
+The `CommandLineTool` above is now included in a single step `Workflow`:
+
+```yaml
+$graph:
+- class: Workflow
+  label: Resolve STAC asset href
+  doc: This workflow resolves a STAC asset href using its key 
+  id: main
+
+  inputs:
+    stac_item:
+      type: string
+    asset:
+      type: string
+
+  outputs:
+    asset_href:
+      outputSource:
+      - node_stac/asset_href
+      type: string
+
+  steps:
+
+    node_stac:
+
+      run: "#asset"
+
+      in:
+        stac_item: stac_item
+        asset: asset
+
+      out:
+        - asset_href
+
+- class: CommandLineTool
+  id: asset
+
+  requirements:
+    DockerRequirement: 
+      dockerPull: terradue/jq
+    ShellCommandRequirement: {}
+    InlineJavascriptRequirement: {}
+
+  baseCommand: curl
+  arguments:
+  - -s
+  - valueFrom: ${ return inputs.stac_item; }
+  - "|"
+  - jq
+  - valueFrom: ${ return ".assets." + inputs.asset + ".href"; }
+  - "|"
+  - tr 
+  - -d
+  - '\"' #\""
+
+  stdout: message
+
+  inputs:
+    stac_item:
+      type: string
+    asset:
+      type: string
+
+  outputs:
+
+    asset_href: 
+      type: string
+      outputBinding:
+        glob: message
+        loadContents: true
+        outputEval: $( self[0].contents.split("\n").join("") )
+
+cwlVersion: v1.0
+```
+
+
+## Execution
 
 It may be run with the parameters:
 
